@@ -12,13 +12,14 @@ const httpServer = createServer(app);
 
 // Determine production URLs
 const FRONTEND_URL = process.env.FRONTEND_URL || 'https://incedent-trackermain.vercel.app';
-const isProduction = process.env.NODE_ENV === 'production' || FRONTEND_URL.includes('vercel.app');
+const RENDER_URL = process.env.RENDER_URL || 'https://incedent-tracker-3.onrender.com';
+const isProduction = process.env.NODE_ENV === 'production';
 
-// Socket.IO CORS - allow Vercel + localhost
+// Socket.IO CORS - allow ALL production origins + localhost for dev
 const socketIOConfig = isProduction
   ? {
       cors: {
-        origin: FRONTEND_URL,
+        origin: ['*'], // Allow all origins in production for mobile compatibility
         methods: ['GET', 'POST'],
         credentials: true
       }
@@ -33,9 +34,14 @@ const socketIOConfig = isProduction
 
 const io = new Server(httpServer, socketIOConfig);
 
-// CORS for Express
+// CORS for Express - Allow Vercel + Render for mobile
 const allowedOrigins = isProduction
-  ? [FRONTEND_URL]
+  ? [
+      'https://incedent-trackermain.vercel.app',
+      'https://incedent-trackermain.vercel.app/',
+      'https://incedent-tracker-3.onrender.com',
+      'https://incedent-tracker-3.onrender.com/'
+    ]
   : ['http://localhost:5173', 'http://localhost:5174'];
 
 app.use(cors({
