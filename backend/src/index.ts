@@ -11,7 +11,7 @@ const app = express();
 const httpServer = createServer(app);
 
 // Determine production URLs
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'https://incedent-trackermain.vercel.app';
 const isProduction = process.env.NODE_ENV === 'production' || FRONTEND_URL.includes('vercel.app');
 
 // Socket.IO CORS - allow Vercel + localhost
