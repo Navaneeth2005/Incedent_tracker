@@ -1,18 +1,40 @@
-import { useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
-
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+import { getSocketUrl } from './apiClient';
 
 let socket: Socket | null = null;
 
 export function getSocket(): Socket {
+  const socketUrl = getSocketUrl();
+  
   if (!socket) {
-    socket = io(BASE_URL, { transports: ['websocket', 'polling'] });
+    socket = io(socketUrl, {
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      // Enable for production
+      forceNew: true,
+    });
+
+    socket.on('connect', () => {
+      console.log('✅ Socket.IO connected');
+    });
+
+    socket.on('disconnect', (reason) => {
+      console.log('❌ Socket.IO disconnected:', reason);
+    });
+
+    socket.on('connect_error', (error) => {
+      console.error('🔴 Socket.IO connection error:', error.message);
+    });
   }
+
   return socket;
 }
 
-export function useSocket() {
-  const socketRef = useRef<Socket>(getSocket());
-  return socketRef.current;
+export function disconnectSocket() {
+  if (socket) {
+    socket.disconnect();
+    socket = null;
+  }
 }

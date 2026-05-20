@@ -1,4 +1,23 @@
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+// Production-safe API client - NO hardcoded localhost
+
+const BASE_URL = import.meta.env.VITE_API_URL;
+
+if (!BASE_URL) {
+  console.warn('⚠️ VITE_API_URL not set! API calls will fail.');
+}
+
+// Fallback to localhost only in development
+const getApiUrl = () => {
+  if (BASE_URL) return BASE_URL;
+  
+  // Only use localhost if we're in development mode
+  if (import.meta.env.DEV) {
+    return 'http://localhost:3001';
+  }
+  
+  // In production without VITE_API_URL, we should fail loudly
+  throw new Error('VITE_API_URL environment variable is not set!');
+};
 
 export interface Incident {
   id: string;
@@ -33,9 +52,11 @@ export interface IncidentDetails extends Incident {
   ai_results: AIResult[];
 }
 
+const API_BASE = getApiUrl();
+
 export const api = {
   async getIncidents(): Promise<Incident[]> {
-    const res = await fetch(`${BASE_URL}/api/incidents`);
+    const res = await fetch(`${API_BASE}/api/incidents`);
     if (!res.ok) throw new Error('Failed to fetch incidents');
     return res.json();
   },
@@ -46,7 +67,7 @@ export const api = {
     priority: string;
     reporter_name: string;
   }): Promise<Incident> {
-    const res = await fetch(`${BASE_URL}/api/incidents`, {
+    const res = await fetch(`${API_BASE}/api/incidents`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -56,13 +77,13 @@ export const api = {
   },
 
   async getIncidentDetails(id: string): Promise<IncidentDetails> {
-    const res = await fetch(`${BASE_URL}/api/incidents/${id}/details`);
+    const res = await fetch(`${API_BASE}/api/incidents/${id}/details`);
     if (!res.ok) throw new Error('Failed to fetch incident details');
     return res.json();
   },
 
   async updateStatus(id: string, status: string): Promise<Incident> {
-    const res = await fetch(`${BASE_URL}/api/incidents/${id}/status`, {
+    const res = await fetch(`${API_BASE}/api/incidents/${id}/status`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status }),
@@ -72,7 +93,7 @@ export const api = {
   },
 
   async postUpdate(id: string, message: string, author_name: string): Promise<IncidentUpdate> {
-    const res = await fetch(`${BASE_URL}/api/incidents/${id}/update`, {
+    const res = await fetch(`${API_BASE}/api/incidents/${id}/update`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message, author_name }),
@@ -82,7 +103,7 @@ export const api = {
   },
 
   async getAIAssist(id: string): Promise<AIResult> {
-    const res = await fetch(`${BASE_URL}/api/incidents/${id}/ai-summary`, {
+    const res = await fetch(`${API_BASE}/api/incidents/${id}/ai-summary`, {
       method: 'POST',
     });
     if (!res.ok) throw new Error('Failed to get AI assist');
@@ -90,7 +111,7 @@ export const api = {
   },
 
   async getAIActions(id: string): Promise<AIResult> {
-    const res = await fetch(`${BASE_URL}/api/incidents/${id}/ai-actions`, {
+    const res = await fetch(`${API_BASE}/api/incidents/${id}/ai-actions`, {
       method: 'POST',
     });
     if (!res.ok) throw new Error('Failed to get AI actions');
@@ -98,10 +119,15 @@ export const api = {
   },
 
   async getAIPriorityReview(id: string): Promise<AIResult> {
-    const res = await fetch(`${BASE_URL}/api/incidents/${id}/ai-priority`, {
+    const res = await fetch(`${API_BASE}/api/incidents/${id}/ai-priority`, {
       method: 'POST',
     });
     if (!res.ok) throw new Error('Failed to get AI priority review');
     return res.json();
   },
+};
+
+// Socket.IO URL - use same base without /api
+export const getSocketUrl = () => {
+  return BASE_URL || 'http://localhost:3001';
 };

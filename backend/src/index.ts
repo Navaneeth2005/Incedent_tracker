@@ -7,62 +7,70 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-import { Incident } from './models/Incident.js';
-import { IncidentUpdate } from './models/IncidentUpdate.js';
-import { AIResult } from './models/AIResult.js';
-
-import {
-  generateAISummary,
-  generateAIActions,
-  generatePriorityReview
-} from './services/aiService.js';
-
 const app = express();
 const httpServer = createServer(app);
 
-// ================= SOCKET.IO =================
+// Determine production URLs
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+const isProduction = process.env.NODE_ENV === 'production' || FRONTEND_URL.includes('vercel.app');
 
-const io = new Server(httpServer, {
-  cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
-    methods: ['GET', 'POST']
-  }
-});
+// Socket.IO CORS - allow Vercel + localhost
+const socketIOConfig = isProduction
+  ? {
+      cors: {
+        origin: FRONTEND_URL,
+        methods: ['GET', 'POST'],
+        credentials: true
+      }
+    }
+  : {
+      cors: {
+        origin: ['http://localhost:5173', 'http://localhost:5174'],
+        methods: ['GET', 'POST'],
+        credentials: true
+      }
+    };
 
-// ================= MIDDLEWARE =================
+const io = new Server(httpServer, socketIOConfig);
 
-const allowedOrigins = process.env.FRONTEND_URL 
-  ? [process.env.FRONTEND_URL, 'http://localhost:5173', 'http://localhost:5174']
+// CORS for Express
+const allowedOrigins = isProduction
+  ? [FRONTEND_URL]
   : ['http://localhost:5173', 'http://localhost:5174'];
 
 app.use(cors({
   origin: allowedOrigins,
   credentials: true
 }));
+
 app.use(express.json());
-
-// ================= ENV =================
-
-const PORT = process.env.PORT || 3001;
 
 // ================= DATABASE =================
 
 const connectDB = async () => {
+  const mongoUri = process.env.MONGODB_URI;
+  
+  if (!mongoUri) {
+    console.error('❌ MONGODB_URI not set in environment variables');
+    process.exit(1);
+  }
+
   try {
-    console.log('Mongo URI:', process.env.MONGODB_URI);
-
-    if (!process.env.MONGODB_URI) {
-      throw new Error('MONGODB_URI is missing in .env');
-    }
-
-    await mongoose.connect(process.env.MONGODB_URI);
-
-    console.log('✅ MongoDB Connected Successfully');
+    console.log('🔄 Connecting to MongoDB Atlas...');
+    await mongoose.connect(mongoUri);
+    console.log('✅ MongoDB Atlas Connected Successfully');
   } catch (error) {
-    console.error('❌ MongoDB connection error:', error);
+    console.error('❌ MongoDB connection error:', (error as Error).message);
     process.exit(1);
   }
 };
+
+// ================= MODELS =================
+
+import { Incident } from './models/Incident.js';
+import { IncidentUpdate } from './models/IncidentUpdate.js';
+import { AIResult } from './models/AIResult.js';
+import { generateAISummary, generateAIActions, generatePriorityReview } from './services/aiService.js';
 
 // Helper to convert MongoDB _id to id
 const toIncident = (doc: any) => {
@@ -75,7 +83,8 @@ const toIncident = (doc: any) => {
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    mongo: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
   });
 });
 
@@ -90,45 +99,22 @@ app.get('/api/incidents', async (req, res) => {
     if (status && status !== 'all') {
       query.status = status;
     }
-
     if (priority && priority !== 'all') {
       query.priority = priority;
     }
-
     if (search) {
       query.$or = [
-        {
-          title: {
-            $regex: search,
-            $options: 'i'
-          }
-        },
-        {
-          description: {
-            $regex: search,
-            $options: 'i'
-          }
-        },
-        {
-          reporter_name: {
-            $regex: search,
-            $options: 'i'
-          }
-        }
+        { title: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } },
+        { reporter_name: { $regex: search, $options: 'i' } }
       ];
     }
 
-    const incidents = await Incident.find(query).sort({
-      created_at: -1
-    });
-
+    const incidents = await Incident.find(query).sort({ created_at: -1 });
     res.json(incidents.map(toIncident));
   } catch (error) {
     console.error('Error fetching incidents:', error);
-
-    res.status(500).json({
-      error: 'Failed to fetch incidents'
-    });
+    res.status(500).json({ error: 'Failed to fetch incidents' });
   }
 });
 
@@ -136,17 +122,10 @@ app.get('/api/incidents', async (req, res) => {
 
 app.post('/api/incidents', async (req, res) => {
   try {
-    const {
-      title,
-      description,
-      priority,
-      reporter_name
-    } = req.body;
+    const { title, description, priority, reporter_name } = req.body;
 
     if (!title || !reporter_name) {
-      return res.status(400).json({
-        error: 'Title and reporter name are required'
-      });
+      return res.status(400).json({ error: 'Title and reporter name are required' });
     }
 
     const incident = new Incident({
@@ -161,18 +140,13 @@ app.post('/api/incidents', async (req, res) => {
     });
 
     await incident.save();
-
     const savedIncident = await Incident.findById(incident._id);
 
-    io.emit('incident_created', savedIncident);
-
-    res.status(201).json(savedIncident);
+    io.emit('incident_created', toIncident(savedIncident));
+    res.status(201).json(toIncident(savedIncident));
   } catch (error) {
     console.error('Error creating incident:', error);
-
-    res.status(500).json({
-      error: 'Failed to create incident'
-    });
+    res.status(500).json({ error: 'Failed to create incident' });
   }
 });
 
@@ -181,20 +155,13 @@ app.post('/api/incidents', async (req, res) => {
 app.get('/api/incidents/:id', async (req, res) => {
   try {
     const incident = await Incident.findById(req.params.id);
-
     if (!incident) {
-      return res.status(404).json({
-        error: 'Incident not found'
-      });
+      return res.status(404).json({ error: 'Incident not found' });
     }
-
     res.json(toIncident(incident));
   } catch (error) {
     console.error('Error fetching incident:', error);
-
-    res.status(500).json({
-      error: 'Failed to fetch incident'
-    });
+    res.status(500).json({ error: 'Failed to fetch incident' });
   }
 });
 
@@ -203,105 +170,67 @@ app.get('/api/incidents/:id', async (req, res) => {
 app.get('/api/incidents/:id/details', async (req, res) => {
   try {
     const incident = await Incident.findById(req.params.id);
-
     if (!incident) {
-      return res.status(404).json({
-        error: 'Incident not found'
-      });
+      return res.status(404).json({ error: 'Incident not found' });
     }
 
-    const updates = await IncidentUpdate.find({
-      incident_id: incident._id
-    }).sort({
-      created_at: 1
-    });
-
-    const ai_results = await AIResult.find({
-      incident_id: incident._id
-    }).sort({
-      created_at: -1
-    });
+    const updates = await IncidentUpdate.find({ incident_id: incident._id }).sort({ created_at: 1 });
+    const ai_results = await AIResult.find({ incident_id: incident._id }).sort({ created_at: -1 });
 
     res.json({
-      ...incident.toObject(),
-      updates,
-      ai_results
+      ...toIncident(incident),
+      updates: updates.map((u: any) => ({ ...u.toObject(), id: u._id.toString() })),
+      ai_results: ai_results.map((a: any) => ({ ...a.toObject(), id: a._id.toString() }))
     });
   } catch (error) {
     console.error('Error fetching incident details:', error);
-
-    res.status(500).json({
-      error: 'Failed to fetch incident details'
-    });
+    res.status(500).json({ error: 'Failed to fetch incident details' });
   }
 });
 
-// ================= UPDATE INCIDENT STATUS =================
+// ================= UPDATE STATUS =================
 
 app.patch('/api/incidents/:id/status', async (req, res) => {
   try {
     const { status } = req.body;
 
-    if (
-      !['Open', 'Investigating', 'Resolved'].includes(status)
-    ) {
-      return res.status(400).json({
-        error: 'Invalid status value'
-      });
+    if (!['Open', 'Investigating', 'Resolved'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status value' });
     }
 
     const incident = await Incident.findByIdAndUpdate(
       req.params.id,
-      {
-        status,
-        updated_at: new Date()
-      },
-      {
-        new: true
-      }
+      { status, updated_at: new Date() },
+      { new: true }
     );
 
     if (!incident) {
-      return res.status(404).json({
-        error: 'Incident not found'
-      });
+      return res.status(404).json({ error: 'Incident not found' });
     }
 
-    io.emit('incident_updated', incident);
-
-    io.emit('status_changed', {
-      incident_id: incident._id,
-      status
-    });
+    io.emit('incident_updated', toIncident(incident));
+    io.emit('status_changed', { incident_id: incident._id.toString(), status });
 
     res.json(toIncident(incident));
   } catch (error) {
     console.error('Error updating status:', error);
-
-    res.status(500).json({
-      error: 'Failed to update status'
-    });
+    res.status(500).json({ error: 'Failed to update status' });
   }
 });
 
-// ================= POST INCIDENT UPDATE =================
+// ================= POST UPDATE =================
 
 app.post('/api/incidents/:id/update', async (req, res) => {
   try {
     const { message, author_name } = req.body;
 
     if (!message || !author_name) {
-      return res.status(400).json({
-        error: 'Message and author name are required'
-      });
+      return res.status(400).json({ error: 'Message and author name are required' });
     }
 
     const incident = await Incident.findById(req.params.id);
-
     if (!incident) {
-      return res.status(404).json({
-        error: 'Incident not found'
-      });
+      return res.status(404).json({ error: 'Incident not found' });
     }
 
     const update = new IncidentUpdate({
@@ -320,36 +249,26 @@ app.post('/api/incidents/:id/update', async (req, res) => {
 
     const updatedIncident = await Incident.findById(req.params.id);
 
-    io.emit('incident_updated', updatedIncident);
-
+    io.emit('incident_updated', toIncident(updatedIncident));
     io.emit('new_update', {
-      incident_id: incident._id,
-      update: {
-        ...update.toObject(),
-        _id: update._id
-      }
+      incident_id: incident._id.toString(),
+      update: { ...update.toObject(), id: update._id.toString() }
     });
 
-    res.status(201).json(update);
+    res.status(201).json({ ...update.toObject(), id: update._id.toString() });
   } catch (error) {
     console.error('Error posting update:', error);
-
-    res.status(500).json({
-      error: 'Failed to post update'
-    });
+    res.status(500).json({ error: 'Failed to post update' });
   }
 });
 
-// ================= AI SUMMARY =================
+// ================= AI ENDPOINTS =================
 
 app.post('/api/incidents/:id/ai-summary', async (req, res) => {
   try {
     const incident = await Incident.findById(req.params.id);
-
     if (!incident) {
-      return res.status(404).json({
-        error: 'Incident not found'
-      });
+      return res.status(404).json({ error: 'Incident not found' });
     }
 
     const summaryText = await generateAISummary({
@@ -366,27 +285,18 @@ app.post('/api/incidents/:id/ai-summary', async (req, res) => {
     });
 
     await aiResult.save();
-
-    res.json(aiResult);
+    res.json({ ...aiResult.toObject(), id: aiResult._id.toString() });
   } catch (error) {
     console.error('Error generating AI summary:', error);
-
-    res.status(500).json({
-      error: 'Failed to generate AI summary'
-    });
+    res.status(500).json({ error: 'Failed to generate AI summary' });
   }
 });
-
-// ================= AI ACTIONS =================
 
 app.post('/api/incidents/:id/ai-actions', async (req, res) => {
   try {
     const incident = await Incident.findById(req.params.id);
-
     if (!incident) {
-      return res.status(404).json({
-        error: 'Incident not found'
-      });
+      return res.status(404).json({ error: 'Incident not found' });
     }
 
     const actionsText = await generateAIActions({
@@ -403,27 +313,18 @@ app.post('/api/incidents/:id/ai-actions', async (req, res) => {
     });
 
     await aiResult.save();
-
-    res.json(aiResult);
+    res.json({ ...aiResult.toObject(), id: aiResult._id.toString() });
   } catch (error) {
     console.error('Error generating AI actions:', error);
-
-    res.status(500).json({
-      error: 'Failed to generate AI actions'
-    });
+    res.status(500).json({ error: 'Failed to generate AI actions' });
   }
 });
-
-// ================= AI PRIORITY REVIEW =================
 
 app.post('/api/incidents/:id/ai-priority', async (req, res) => {
   try {
     const incident = await Incident.findById(req.params.id);
-
     if (!incident) {
-      return res.status(404).json({
-        error: 'Incident not found'
-      });
+      return res.status(404).json({ error: 'Incident not found' });
     }
 
     const priorityText = await generatePriorityReview({
@@ -440,44 +341,54 @@ app.post('/api/incidents/:id/ai-priority', async (req, res) => {
     });
 
     await aiResult.save();
-
-    res.json(aiResult);
+    res.json({ ...aiResult.toObject(), id: aiResult._id.toString() });
   } catch (error) {
     console.error('Error generating AI priority review:', error);
-
-    res.status(500).json({
-      error: 'Failed to generate AI priority review'
-    });
+    res.status(500).json({ error: 'Failed to generate AI priority review' });
   }
 });
 
-// ================= SOCKET EVENTS =================
+// ================= SOCKET.IO =================
 
 io.on('connection', (socket) => {
-  console.log('✅ Client connected:', socket.id);
+  console.log(`Client connected: ${socket.id}`);
 
   socket.on('disconnect', () => {
-    console.log('❌ Client disconnected:', socket.id);
+    console.log(`Client disconnected: ${socket.id}`);
   });
 });
 
 // ================= START SERVER =================
 
+const PORT = parseInt(process.env.PORT || '3001', 10);
+
 const startServer = async () => {
   await connectDB();
 
-  httpServer.listen(PORT, () => {
-    console.log(`🚀 Server running on http://localhost:${PORT}`);
-    console.log('📡 Socket.IO enabled');
-
-    console.log(
-      `🧠 AI Mode: ${
-        process.env.OPENAI_API_KEY
-          ? 'OpenAI Connected'
-          : 'Fallback Mode'
-      }`
-    );
+  // Bind to 0.0.0.0 for production (Render)
+  httpServer.listen(PORT, '0.0.0.0', () => {
+    console.log(`
+╔═══════════════════════════════════════════════════╗
+║  🚀 Server running on port ${PORT}                      ║
+║  📡 Socket.IO enabled                               ║
+║  🌐 Environment: ${isProduction ? 'PRODUCTION' : 'DEVELOPMENT'}                         ║
+║  🔗 CORS allowed: ${allowedOrigins.join(', ')}  ║
+╚═══════════════════════════════════════════════════╝
+    `);
   });
 };
 
-startServer();
+startServer().catch((error) => {
+  console.error('Failed to start server:', error);
+  process.exit(1);
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
