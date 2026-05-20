@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Plus, Loader2, AlertCircle } from 'lucide-react';
-import { api } from '../lib/api';
+import { api } from '../lib/apiClient';
 
 interface CreateIncidentFormProps {
   onCreated: () => void;

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Bell } from 'lucide-react';
-import { api, type Incident } from './lib/api';
+import { api, type Incident } from './lib/apiClient';
 import { getSocket } from './lib/socket';
 import { useToast } from './hooks/useToast';
 import CreateIncidentForm from './components/CreateIncidentForm';

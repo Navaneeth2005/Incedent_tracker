@@ -1,157 +1,266 @@
-# Real-Time AI Incident Room
+# 🚨 Real-Time AI Incident Tracker
 
-A production-quality, real-time operations dashboard for DevOps/SRE teams.
+A production-style real-time incident management system designed for DevOps/SRE teams with AI-powered insights, built using MERN stack + Socket.IO.
 
-## Tech Stack
+---
+
+## 🌐 Live Demo
+
+- **Frontend (Vercel):** https://incedent-trackermain.vercel.app/ 
+- **Backend (Render):** https://incedent-tracker-3.onrender.com  
+
+> Replace the above with your actual deployed URLs.
+
+---
+
+## ⚙️ Tech Stack
 
 | Layer | Technology |
-|-------|-------------|
-| Frontend | React + Vite + Tailwind CSS v4 + Framer Motion |
+|------|-------------|
+| Frontend | React + Vite + Tailwind CSS + Framer Motion |
 | Backend | Node.js + Express + TypeScript |
-| Database | MongoDB with Mongoose ODM |
+| Database | MongoDB Atlas (Mongoose ODM) |
 | Real-time | Socket.IO |
-| AI | OpenAI API (with rule-based fallback) |
+| AI Layer | OpenAI API + Rule-based fallback system |
 
-## Quick Start
+---
 
-### Prerequisites
-- Node.js v18+
-- MongoDB (local or MongoDB Atlas)
+## 🏗️ System Architecture
 
-### Step 1: Setup MongoDB
-
-**Option A - Local MongoDB:**
-```bash
-# Using Docker
-docker run -d -p 27017:27017 --name mongodb mongo:latest
-
-# Or download from https://www.mongodb.com/try/download/community
 ```
 
-**Option B - MongoDB Atlas (Cloud):**
-1. Go to https://www.mongodb.com/cloud/atlas
-2. Create free cluster
-3. Get connection string: `mongodb+srv://username:password@cluster.mongodb.net/incident-room`
+Frontend (React - Vercel)
+↓
+Backend API + Socket.IO (Render)
+↓
+MongoDB Atlas (Database)
+↓
+AI Service (OpenAI + Fallback Logic)
 
-### Step 2: Configure Environment
+```
 
-**Backend - Edit `backend/.env`:**
-```env
+---
+
+## 🚀 Deployment Guide
+
+### 🖥️ Frontend Deployment (Vercel)
+
+1. Push project to GitHub
+2. Go to https://vercel.com
+3. Import repository
+4. Configure:
+
+```
+
+Root Directory: frontend
+Framework: Vite
+
+```
+
+---
+
+### 🔐 Frontend Environment Variables (Vercel)
+
+```
+
+VITE_API_URL=https://your-render-backend.onrender.com
+
+```
+
+Then click **Deploy**
+
+---
+
+### 🧠 Backend Deployment (Render)
+
+1. Go to https://dashboard.render.com
+2. Create **New Web Service**
+3. Connect GitHub repo
+4. Configure:
+
+```
+
+Root Directory: backend
+Build Command: npm install && npm run build
+Start Command: npm start
+
+```
+
+---
+
+### 🔐 Backend Environment Variables (Render)
+
+```
+
+MONGODB_URI=your_mongodb_atlas_connection_string
+PORT=10000
+OPENAI_API_KEY=your_openai_key (optional)
+FRONTEND_URL=https://your-vercel-app.vercel.app
+
+```
+
+---
+
+## 📦 Features
+
+### 📊 Incident Management
+- Create, update, and track incidents in real time
+- Status flow: Open → Investigating → Resolved
+- Priority classification system
+
+---
+
+### ⚡ Real-Time Updates
+- Socket.IO powered live synchronization
+- Instant updates across all connected clients
+
+---
+
+### 🤖 AI Incident Assistant
+- AI-generated incident summaries
+- Suggested debugging actions
+- Smart priority recommendations
+- Rule-based fallback when AI key is not available
+
+---
+
+### 📡 DevOps Dashboard
+- Live incident feed
+- Filtering & search functionality
+- Timeline-based incident tracking
+- System health insights
+
+---
+
+## 🔌 API Endpoints
+
+| Method | Endpoint | Description |
+|------|----------|-------------|
+| GET | /api/incidents | Fetch all incidents |
+| POST | /api/incidents | Create new incident |
+| GET | /api/incidents/:id | Get incident details |
+| PATCH | /api/incidents/:id/status | Update incident status |
+| POST | /api/incidents/:id/update | Add incident update |
+| POST | /api/incidents/:id/ai-summary | Generate AI summary |
+| POST | /api/incidents/:id/ai-actions | AI suggested actions |
+| POST | /api/incidents/:id/ai-priority | AI priority analysis |
+
+---
+
+## 🧪 Local Development Setup
+
+### 1️⃣ Clone Repository
+```bash
+git clone https://github.com/your-username/incident-tracker
+cd incident-tracker
+```
+
+---
+
+### 2️⃣ Backend Setup
+
+```bash
+cd backend
+npm install
+```
+
+Create `.env` file:
+
+```
 MONGODB_URI=mongodb://localhost:27017/incident-room
 PORT=3001
-OPENAI_API_KEY=sk-your-openai-key-here  # Optional - leave empty for fallback mode
+OPENAI_API_KEY=your_key_here
 FRONTEND_URL=http://localhost:5173
 ```
 
-**Frontend - Edit `frontend/.env`:**
-```env
+Run backend:
+
+```bash
+npm run dev
+```
+
+---
+
+### 3️⃣ Frontend Setup
+
+```bash
+cd frontend
+npm install
+```
+
+Create `.env` file:
+
+```
 VITE_API_URL=http://localhost:3001
 ```
 
-### Step 3: Install Dependencies
+Run frontend:
 
 ```bash
-# Backend
-cd backend
-npm install
-
-# Frontend
-cd ../frontend
-npm install
-```
-
-### Step 4: Run the Application
-
-**Terminal 1 - Backend:**
-```bash
-cd backend
 npm run dev
 ```
-Should see: `🚀 Server running on http://localhost:3001`
 
-**Terminal 2 - Frontend:**
-```bash
-cd frontend
-npm run dev
-```
-Should see: `Local: http://localhost:5173/`
+---
 
-### Step 5: Open Browser
-
-Navigate to http://localhost:5173
-
-## Features
-
-- **Incident Dashboard** - Real-time card list with search + status/priority filters
-- **Create Incident** - Form with validation, instant socket broadcast
-- **Live Updates** - Per-incident timeline with Socket.IO sync
-- **Status Workflow** - Open → Investigating → Resolved
-- **AI Assist** - OpenAI-powered summary, actions, priority validation
-- **Pipeline Monitor** - Animated infrastructure health widget
-- **Fallback AI** - Works without OpenAI key using intelligent rule-based system
-
-## AI Feature
-
-The app works **without an OpenAI key** using built-in fallback logic:
-
-- **Database issues** → Suggests connection pool, slow queries, replica health
-- **API failures** → Suggests gateway logs, rate limits, endpoint verification
-- **Auth problems** → Suggests token checks, LDAP status, permissions
-- **Network issues** → Suggests DNS, firewall, load balancer checks
-
-To enable real AI: Add your OpenAI key to `backend/.env`:
-```
-OPENAI_API_KEY=sk-...
-```
-
-## API Routes
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | /api/incidents | List incidents |
-| POST | /api/incidents | Create incident |
-| GET | /api/incidents/:id | Get incident |
-| GET | /api/incidents/:id/details | Get with updates + AI |
-| PATCH | /api/incidents/:id/status | Update status |
-| POST | /api/incidents/:id/update | Add update |
-| POST | /api/incidents/:id/ai-summary | AI summary |
-| POST | /api/incidents/:id/ai-actions | AI actions |
-| POST | /api/incidents/:id/ai-priority | AI priority review |
-
-## Deployment
-
-### Backend (Render/Railway)
-```bash
-# Set environment variables:
-# MONGODB_URI, PORT=3001, OPENAI_API_KEY, FRONTEND_URL
-npm run build
-npm start
-```
-
-### Frontend (Vercel)
-```bash
-# Set VITE_API_URL=https://your-backend-url
-npm run build
-# Deploy dist folder
-```
-
-## Project Structure
+## 📁 Project Structure
 
 ```
-ProjectDemo/
-├── backend/
-│   ├── src/
-│   │   ├── index.ts           # Express + Socket.IO server
-│   │   ├── models/            # Mongoose models
-│   │   └── services/aiService.ts
-│   ├── .env
-│   └── package.json
-├── frontend/
-│   ├── src/
-│   │   ├── components/        # React components
-│   │   ├── hooks/             # Custom hooks
-│   │   └── lib/               # API + Socket clients
-│   ├── .env
-│   └── package.json
-└── README.md
-```"# Incedent_tracker" 
+backend/
+ ├── src/
+ │   ├── index.ts
+ │   ├── models/
+ │   │   ├── Incident.ts
+ │   │   ├── IncidentUpdate.ts
+ │   │   └── AIResult.ts
+ │   └── services/
+ │       └── aiService.ts
+
+frontend/
+ ├── src/
+ │   ├── components/
+ │   │   ├── Badges.tsx
+ │   │   ├── CreateIncidentForm.tsx
+ │   │   ├── IncidentCard.tsx
+ │   │   ├── IncidentDashboard.tsx
+ │   │   ├── IncidentDetail.tsx
+ │   │   ├── PipelineMonitor.tsx
+ │   │   └── ToastContainer.tsx
+ │   ├── lib/
+ │   │   ├── apiClient.ts
+ │   │   └── socket.ts
+ │   ├── hooks/
+ │   │   └── useToast.ts
+ │   ├── App.tsx
+ │   └── index.css
+```
+
+---
+
+## ⭐ Key Highlights
+
+- ⚡ Real-time incident tracking using Socket.IO
+- 🤖 AI-powered incident analysis engine
+- 🔄 Scalable MERN architecture
+- 🌍 Fully deployed (Vercel + Render + MongoDB Atlas)
+- 🧠 Smart fallback AI system (works without API key)
+- 📡 Production-ready API design
+- 🎨 Premium Polar-style dark UI
+
+---
+
+## 🚀 Future Improvements
+
+- Role-based authentication (RBAC)
+- Email & Slack incident alerts
+- Kubernetes deployment support
+- Redis caching layer
+- Advanced observability dashboard
+- Audit logs & analytics module
+
+---
+
+## 👨‍💻 Author
+
+**Navaneeth Indarapu**  
+Full Stack Developer | MERN | DSA Enthusiast  
+Malla Reddy Engineering College (2026)

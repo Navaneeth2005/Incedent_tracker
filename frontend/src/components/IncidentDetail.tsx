@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Clock, User, Send, Loader2, Bot, Sparkles } from 'lucide-react';
-import { api, type IncidentDetails, type AIResult } from '../lib/api';
+import { api, type IncidentDetails, type AIResult } from '../lib/apiClient';
 import { StatusBadge, PriorityBadge } from './Badges';
 import { getSocket } from '../lib/socket';
 

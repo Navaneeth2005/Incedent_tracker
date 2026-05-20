@@ -1,5 +1,5 @@
 import { StatusBadge, PriorityBadge } from './Badges';
-import type { Incident } from '../lib/api';
+import type { Incident } from '../lib/apiClient';
 
 interface IncidentCardProps {
   incident: Incident;

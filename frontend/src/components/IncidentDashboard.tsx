@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Inbox } from 'lucide-react';
 import IncidentCard from './IncidentCard';
-import type { Incident } from '../lib/api';
+import type { Incident } from '../lib/apiClient';
 
 interface IncidentDashboardProps {
   incidents: Incident[];
